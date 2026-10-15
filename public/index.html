@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LANLink - Connect Locally. Share Freely.</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header & Branding -->
+        <header class="header">
+            <div class="logo-container">
+                <i class="fa-solid fa-wifi logo-icon"></i>
+                <i class="fa-solid fa-arrow-right-arrow-left logo-icon-sub"></i>
+                <h1>LAN<span>Link</span></h1>
+            </div>
+            <p class="tagline">Connect Locally. Share Freely.</p>
+        </header>
+
+        <!-- Device Identity & Local Connection Card -->
+        <section class="card connection-card">
+            <div class="card-header">
+                <i class="fa-solid fa-laptop-mobile header-icon"></i>
+                <h2>Device Identity</h2>
+            </div>
+            <div class="card-body">
+                <div class="input-group">
+                    <label for="device-name">Your Device Name:</label>
+                    <input type="text" id="device-name" placeholder="e.g. My Phone / Laptop" value="">
+                    <button id="save-device-btn" class="btn btn-secondary">Save</button>
+                </div>
+                <div class="status-badge" id="network-status">
+                    <span class="status-dot online"></span>
+                    <span id="status-text">Connected to LAN</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Discovered Local Devices -->
+        <section class="card peers-card">
+            <div class="card-header">
+                <i class="fa-solid fa-network-wired header-icon"></i>
+                <h2>Discovered Peers on Network</h2>
+            </div>
+            <div class="card-body">
+                <div id="peer-list" class="peer-list">
+                    <div class="empty-peers">Scanning for nearby LANLink devices...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- File Upload / Drag & Drop Section -->
+        <section class="card transfer-card">
+            <div class="card-header">
+                <i class="fa-solid fa-paper-plane header-icon"></i>
+                <h2>Send Files</h2>
+            </div>
+            <div class="card-body">
+                <div class="drop-zone" id="drop-zone">
+                    <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                    <p class="drop-text">Drag & drop files here or <span>browse</span></p>
+                    <input type="file" id="file-input" hidden multiple>
+                </div>
+                
+                <div class="selected-file-info" id="file-info" style="display: none;">
+                    <div class="file-details">
+                        <i class="fa-solid fa-file file-icon"></i>
+                        <span id="selected-file-name">filename.ext</span>
+                        <span id="selected-file-size" class="file-size">(0 MB)</span>
+                    </div>
+                    <button id="clear-file-btn" class="btn-icon"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="action-row">
+                    <select id="target-peer-select" class="peer-select">
+                        <option value="">Select Target Device...</option>
+                    </select>
+                    <button id="send-btn" class="btn btn-primary" disabled>
+                        <i class="fa-solid fa-share-nodes"></i> Send File
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Real-Time Progress Indicator -->
+        <section class="card progress-card" id="progress-card" style="display: none;">
+            <div class="card-header">
+                <i class="fa-solid fa-bars-progress header-icon"></i>
+                <h2 id="progress-title">Transferring...</h2>
+            </div>
+            <div class="card-body">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                </div>
+                <div class="progress-stats">
+                    <span id="progress-percentage">0%</span>
+                    <span id="transfer-speed">0 KB/s</span>
+                    <span id="transfer-eta">ETA: --</span>
+                </div>
+                <button id="cancel-btn" class="btn btn-danger">Cancel Transfer</button>
+            </div>
+        </section>
+
+        <!-- Notification Toast -->
+        <div id="toast" class="toast" style="display: none;"></div>
+    </div>
+
+    <!-- Socket.io Library -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
