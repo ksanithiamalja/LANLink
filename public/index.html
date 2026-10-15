@@ -5,12 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LANLink - Connect Locally. Share Freely.</title>
     <link rel="stylesheet" href="style.css">
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="app-container">
-        <!-- Header & Branding -->
+        <!-- Header -->
         <header class="header">
             <div class="logo-container">
                 <i class="fa-solid fa-wifi logo-icon"></i>
@@ -20,7 +19,7 @@
             <p class="tagline">Connect Locally. Share Freely.</p>
         </header>
 
-        <!-- Device Identity & Local Connection Card -->
+        <!-- Device Identity Card -->
         <section class="card connection-card">
             <div class="card-header">
                 <i class="fa-solid fa-laptop-mobile header-icon"></i>
@@ -28,13 +27,13 @@
             </div>
             <div class="card-body">
                 <div class="input-group">
-                    <label for="device-name">Your Device Name:</label>
-                    <input type="text" id="device-name" placeholder="e.g. My Phone / Laptop" value="">
+                    <label for="device-name">Device Name:</label>
+                    <input type="text" id="device-name" placeholder="e.g. My Phone / Laptop">
                     <button id="save-device-btn" class="btn btn-secondary">Save</button>
                 </div>
                 <div class="status-badge" id="network-status">
                     <span class="status-dot online"></span>
-                    <span id="status-text">Connected to LAN</span>
+                    <span id="status-text">Connecting to LAN...</span>
                 </div>
             </div>
         </section>
@@ -47,23 +46,23 @@
             </div>
             <div class="card-body">
                 <div id="peer-list" class="peer-list">
-                    <div class="empty-peers">Scanning for nearby LANLink devices...</div>
+                    <div class="empty-peers">Scanning for nearby devices...</div>
                 </div>
             </div>
         </section>
 
-        <!-- File Upload / Drag & Drop Section -->
+        <!-- File Upload & Target Selection (Mobile-Native Label Picker) -->
         <section class="card transfer-card">
             <div class="card-header">
                 <i class="fa-solid fa-paper-plane header-icon"></i>
                 <h2>Send Files</h2>
             </div>
             <div class="card-body">
-                <div class="drop-zone" id="drop-zone">
+                <label for="file-input" class="drop-zone" id="drop-zone">
                     <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
-                    <p class="drop-text">Drag & drop files here or <span>browse</span></p>
-                    <input type="file" id="file-input" hidden multiple>
-                </div>
+                    <p class="drop-text">Tap or drop files here to <span>browse</span></p>
+                    <input type="file" id="file-input" style="display: none;">
+                </label>
                 
                 <div class="selected-file-info" id="file-info" style="display: none;">
                     <div class="file-details">
@@ -85,7 +84,7 @@
             </div>
         </section>
 
-        <!-- Real-Time Progress Indicator -->
+        <!-- Progress Card -->
         <section class="card progress-card" id="progress-card" style="display: none;">
             <div class="card-header">
                 <i class="fa-solid fa-bars-progress header-icon"></i>
@@ -104,11 +103,10 @@
             </div>
         </section>
 
-        <!-- Notification Toast -->
+        <!-- Toast Notification -->
         <div id="toast" class="toast" style="display: none;"></div>
     </div>
 
-    <!-- Socket.io Library -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js"></script>
 </body>

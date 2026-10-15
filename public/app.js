@@ -1,4 +1,4 @@
-// Connect with fallback transport support for mobile browsers
+// Connect with Socket.io
 const socket = io();
 
 // DOM Elements
@@ -115,9 +115,7 @@ function renderTargetSelect() {
     updateSendButtonState();
 }
 
-// File Selection Setup
-dropZone.addEventListener('click', () => fileInput.click());
-
+// Drag & Drop Event Handlers
 dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropZone.classList.add('dragover');
@@ -131,6 +129,7 @@ dropZone.addEventListener('drop', (e) => {
     if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
 });
 
+// File Selection Handler (Handles both tap and file picker change)
 fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
 });
@@ -143,7 +142,8 @@ function handleFileSelect(file) {
     updateSendButtonState();
 }
 
-clearFileBtn.addEventListener('click', () => {
+clearFileBtn.addEventListener('click', (e) => {
+    e.preventDefault();
     selectedFile = null;
     fileInput.value = '';
     fileInfo.style.display = 'none';
@@ -235,7 +235,7 @@ socket.on('transfer_rejected', (data) => {
     currentTransfer = null;
 });
 
-// Stream Chunks (Works on Mobile + Desktop)
+// Stream Chunks (FileReader for Mobile & Desktop compatibility)
 async function streamChunks() {
     const file = currentTransfer.file;
     let offset = 0;
@@ -245,7 +245,6 @@ async function streamChunks() {
 
         const slice = file.slice(offset, offset + CHUNK_SIZE);
         
-        // Use FileReader for guaranteed cross-browser mobile binary compatibility
         const buffer = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
