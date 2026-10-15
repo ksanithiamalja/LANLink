@@ -1,4 +1,3 @@
-// Initialize Socket.io connection
 const socket = io();
 
 // DOM Elements
@@ -16,15 +15,30 @@ const clearFileBtn = document.getElementById('clear-file-btn');
 const sendBtn = document.getElementById('send-btn');
 const toast = document.getElementById('toast');
 
+// Progress Card Elements
+const progressCard = document.getElementById('progress-card');
+const progressTitle = document.getElementById('progress-title');
+const progressBarFill = document.getElementById('progress-bar-fill');
+const progressPercentage = document.getElementById('progress-percentage');
+const transferSpeed = document.getElementById('transfer-speed');
+const transferEta = document.getElementById('transfer-eta');
+const cancelBtn = document.getElementById('cancel-btn');
+
 // State Variables
 let selectedFile = null;
 let activePeers = [];
 let localDeviceName = localStorage.getItem('lanlink_device_name') || generateDefaultDeviceName();
 
-// Initialize UI State
+// Transfer Control Variables
+const CHUNK_SIZE = 64 * 1024; // 64 KB chunks
+let currentTransfer = null;
+let incomingFileBuffer = [];
+let receivedBytes = 0;
+let transferStartTime = 0;
+
+// Initialize Device Identity
 deviceNameInput.value = localDeviceName;
 
-// Helper: Generate default device name based on OS/Browser
 function generateDefaultDeviceName() {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const platform = isMobile ? 'Mobile' : 'Laptop/PC';
@@ -32,7 +46,6 @@ function generateDefaultDeviceName() {
     return `${platform}-${randomId}`;
 }
 
-// Register device with WebSocket server
 function registerDevice() {
     socket.emit('register_device', {
         name: localDeviceName,
@@ -40,7 +53,6 @@ function registerDevice() {
     });
 }
 
-// Save Custom Device Name
 saveDeviceBtn.addEventListener('click', () => {
     const newName = deviceNameInput.value.trim();
     if (newName) {
@@ -51,7 +63,7 @@ saveDeviceBtn.addEventListener('click', () => {
     }
 });
 
-// Socket Event Handlers
+// Socket Connection Events
 socket.on('connect', () => {
     statusText.textContent = 'Connected to LANLink Server';
     registerDevice();
@@ -61,15 +73,12 @@ socket.on('disconnect', () => {
     statusText.textContent = 'Disconnected from Server';
 });
 
-// Real-time Peer List Update
 socket.on('update_peer_list', (peers) => {
-    // Filter out our own device
     activePeers = peers.filter(peer => peer.id !== socket.id);
     renderPeerList();
     renderTargetSelect();
 });
 
-// Render Discovered Devices
 function renderPeerList() {
     if (activePeers.length === 0) {
         peerListContainer.innerHTML = '<div class="empty-peers"><i class="fa-solid fa-spinner fa-spin"></i> Scanning for nearby LANLink devices...</div>';
@@ -94,21 +103,18 @@ function renderPeerList() {
     });
 }
 
-// Render Select Dropdown for Sending Files
 function renderTargetSelect() {
     targetPeerSelect.innerHTML = '<option value="">Select Target Device...</option>';
-    
     activePeers.forEach(peer => {
         const option = document.createElement('option');
         option.value = peer.id;
         option.textContent = peer.name;
         targetPeerSelect.appendChild(option);
     });
-
     updateSendButtonState();
 }
 
-// File Picker & Drag and Drop Setup
+// File Selection & Drag-and-Drop
 dropZone.addEventListener('click', () => fileInput.click());
 
 dropZone.addEventListener('dragover', (e) => {
@@ -116,22 +122,16 @@ dropZone.addEventListener('dragover', (e) => {
     dropZone.classList.add('dragover');
 });
 
-dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragover');
-});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length > 0) {
-        handleFileSelect(e.dataTransfer.files[0]);
-    }
+    if (e.dataTransfer.files.length > 0) handleFileSelect(e.dataTransfer.files[0]);
 });
 
 fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        handleFileSelect(e.target.files[0]);
-    }
+    if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
 });
 
 function handleFileSelect(file) {
@@ -155,7 +155,207 @@ function updateSendButtonState() {
     sendBtn.disabled = !(selectedFile && targetPeerSelect.value);
 }
 
-// Utility Functions
+// SHA-256 Hash Computation for Integrity Verification
+async function calculateSHA256(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Initiate Sending File
+sendBtn.addEventListener('click', async () => {
+    if (!selectedFile || !targetPeerSelect.value) return;
+
+    const targetId = targetPeerSelect.value;
+    showToast('Calculating checksum & requesting transfer...');
+    
+    const checksum = await calculateSHA256(selectedFile);
+
+    currentTransfer = {
+        role: 'sender',
+        targetId: targetId,
+        file: selectedFile,
+        checksum: checksum,
+        isCancelled: false
+    };
+
+    socket.emit('request_transfer', {
+        targetId: targetId,
+        filename: selectedFile.name,
+        filesize: selectedFile.size,
+        filetype: selectedFile.type,
+        checksum: checksum
+    });
+});
+
+// Receiver Side: Handle Incoming Request
+socket.on('incoming_transfer_request', (data) => {
+    const accept = confirm(`Incoming file from ${data.senderName}:\n\nFilename: ${data.filename}\nSize: ${formatBytes(data.filesize)}\n\nDo you want to accept this transfer?`);
+    
+    if (accept) {
+        currentTransfer = {
+            role: 'receiver',
+            senderId: data.senderId,
+            filename: data.filename,
+            filesize: data.filesize,
+            filetype: data.filetype,
+            checksum: data.checksum,
+            isCancelled: false
+        };
+
+        incomingFileBuffer = [];
+        receivedBytes = 0;
+        transferStartTime = Date.now();
+
+        socket.emit('accept_transfer', { senderId: data.senderId });
+        showProgressUI('Receiving File...');
+    } else {
+        socket.emit('reject_transfer', { senderId: data.senderId });
+    }
+});
+
+// Sender Side: Transfer Accepted -> Start Chunk Streaming
+socket.on('transfer_accepted', (data) => {
+    if (!currentTransfer || currentTransfer.isCancelled) return;
+
+    showProgressUI('Sending File...');
+    transferStartTime = Date.now();
+    streamChunks();
+});
+
+socket.on('transfer_rejected', (data) => {
+    hideProgressUI();
+    alert(`Transfer Rejected: ${data.reason}`);
+    currentTransfer = null;
+});
+
+// Chunk Streaming Logic (Sender)
+async function streamChunks() {
+    const file = currentTransfer.file;
+    let offset = 0;
+
+    while (offset < file.size) {
+        if (!currentTransfer || currentTransfer.isCancelled) break;
+
+        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        const buffer = await slice.arrayBuffer();
+
+        const isLast = (offset + CHUNK_SIZE) >= file.size;
+
+        socket.emit('send_chunk', {
+            targetId: currentTransfer.targetId,
+            chunk: buffer,
+            offset: offset,
+            isLast: isLast
+        });
+
+        offset += CHUNK_SIZE;
+        updateProgressUI(Math.min(offset, file.size), file.size);
+
+        // Small asynchronous delay for event-loop responsiveness
+        await new Promise(resolve => setTimeout(resolve, 5));
+    }
+
+    if (currentTransfer && !currentTransfer.isCancelled) {
+        showToast('File transfer completed!');
+        setTimeout(hideProgressUI, 2000);
+    }
+}
+
+// Receiver Side: Buffer Chunks
+socket.on('receive_chunk', async (data) => {
+    if (!currentTransfer || currentTransfer.isCancelled) return;
+
+    incomingFileBuffer.push(data.chunk);
+    receivedBytes += data.chunk.byteLength;
+
+    updateProgressUI(receivedBytes, currentTransfer.filesize);
+
+    if (data.isLast) {
+        showToast('Verifying file integrity...');
+        const blob = new Blob(incomingFileBuffer, { type: currentTransfer.filetype || 'application/octet-stream' });
+        
+        // Checksum Verification
+        const receivedArrayBuffer = await blob.arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', receivedArrayBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const computedChecksum = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+        if (computedChecksum === currentTransfer.checksum) {
+            triggerFileDownload(blob, currentTransfer.filename);
+            showToast('Integrity verified! Download started.');
+        } else {
+            alert('Security Warning: SHA-256 Checksum mismatch! File may be corrupted.');
+        }
+
+        setTimeout(hideProgressUI, 2000);
+        currentTransfer = null;
+    }
+});
+
+// Trigger Browser File Download
+function triggerFileDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `received_${filename}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Cancel Transfer Event
+cancelBtn.addEventListener('click', () => {
+    if (currentTransfer) {
+        currentTransfer.isCancelled = true;
+        const targetId = currentTransfer.role === 'sender' ? currentTransfer.targetId : currentTransfer.senderId;
+        socket.emit('cancel_transfer', { targetId: targetId });
+        hideProgressUI();
+        showToast('Transfer cancelled.');
+        currentTransfer = null;
+    }
+});
+
+socket.on('transfer_cancelled', (data) => {
+    if (currentTransfer) currentTransfer.isCancelled = true;
+    hideProgressUI();
+    alert(data.reason);
+    currentTransfer = null;
+});
+
+// UI Progress Helpers
+function showProgressUI(title) {
+    progressTitle.textContent = title;
+    progressCard.style.display = 'block';
+    progressBarFill.style.width = '0%';
+    progressPercentage.textContent = '0%';
+    transferSpeed.textContent = '0 KB/s';
+    transferEta.textContent = 'ETA: --';
+}
+
+function hideProgressUI() {
+    progressCard.style.display = 'none';
+}
+
+function updateProgressUI(current, total) {
+    const percentage = Math.min(Math.round((current / total) * 100), 100);
+    progressBarFill.style.width = `${percentage}%`;
+    progressPercentage.textContent = `${percentage}%`;
+
+    const elapsedTime = (Date.now() - transferStartTime) / 1000;
+    if (elapsedTime > 0) {
+        const speedBytesPerSec = current / elapsedTime;
+        transferSpeed.textContent = formatBytes(speedBytesPerSec) + '/s';
+
+        const remainingBytes = total - current;
+        const etaSeconds = Math.round(remainingBytes / speedBytesPerSec);
+        transferEta.textContent = `ETA: ${isFinite(etaSeconds) ? etaSeconds + 's' : '--'}`;
+    }
+}
+
+// Utility Helpers
 function formatBytes(bytes) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -167,9 +367,7 @@ function formatBytes(bytes) {
 function showToast(message) {
     toast.textContent = message;
     toast.style.display = 'block';
-    setTimeout(() => {
-        toast.style.display = 'none';
-    }, 3000);
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
 }
 
 function escapeHtml(str) {

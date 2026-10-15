@@ -9,7 +9,8 @@ const cors = require('cors');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: '*' }
+    cors: { origin: '*' },
+    maxHttpBufferSize: 1e8 // 100 MB buffer max
 });
 
 const PORT = 3000;
@@ -38,18 +39,56 @@ let activePeers = {};
 io.on('connection', (socket) => {
     console.log(`Device connected: ${socket.id}`);
 
+    // Register Peer Device
     socket.on('register_device', (deviceInfo) => {
         activePeers[socket.id] = {
             id: socket.id,
             name: deviceInfo.name || 'Unknown Device',
-            type: deviceInfo.type || 'Mobile/Desktop',
+            userAgent: deviceInfo.userAgent,
             ip: socket.handshake.address
         };
         io.emit('update_peer_list', Object.values(activePeers));
     });
 
+    // 1. Transfer Request Signaling
+    socket.on('request_transfer', (data) => {
+        // Sanitize file path to prevent Path Traversal
+        const sanitizedFilename = path.basename(data.filename);
+        data.filename = sanitizedFilename;
+        socket.to(data.targetId).emit('incoming_transfer_request', {
+            senderId: socket.id,
+            senderName: activePeers[socket.id]?.name || 'Peer Device',
+            filename: sanitizedFilename,
+            filesize: data.filesize,
+            filetype: data.filetype,
+            checksum: data.checksum
+        });
+    });
+
+    // 2. Transfer Acceptance
+    socket.on('accept_transfer', (data) => {
+        socket.to(data.senderId).emit('transfer_accepted', { receiverId: socket.id });
+    });
+
+    // 3. Transfer Rejection
+    socket.on('reject_transfer', (data) => {
+        socket.to(data.senderId).emit('transfer_rejected', { reason: 'Recipient declined the transfer.' });
+    });
+
+    // 4. Binary Chunk Relay
     socket.on('send_chunk', (data) => {
-        socket.to(data.targetId).emit('receive_chunk', data);
+        socket.to(data.targetId).emit('receive_chunk', {
+            chunk: data.chunk,
+            offset: data.offset,
+            isLast: data.isLast
+        });
+    });
+
+    // 5. Transfer Cancellation Signal
+    socket.on('cancel_transfer', (data) => {
+        socket.to(data.targetId).emit('transfer_cancelled', {
+            reason: 'Transfer was cancelled by the other device.'
+        });
     });
 
     socket.on('disconnect', () => {
