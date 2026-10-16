@@ -72,14 +72,14 @@
 
 * Memory Safety: Buffer payloads on the server are constrained (`maxHttpBufferSize: 1e8`) to prevent heap exhaustion attacks.
 
-##📄 License & Deliverables
+## 📄 License & Deliverables
 
-*Project Name: LANLink
+* Project Name: LANLink
 
-*Tagline: Connect Locally. Share Freely.
+* Tagline: Connect Locally. Share Freely.
 
-*Submission Date: October 16, 2026
+* Submission Date: October 16, 2026
 
-*Repository: `ksanithiamalja/lanlink`
+* Repository: `ksanithiamalja/lanlink`
 
 
