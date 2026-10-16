@@ -5,39 +5,41 @@
 **Submission Date:** 16 October 2026  
 
 ---
-
 ## 📐 1. System Architecture Diagram
 
-+-----------------------------------------------------------------------+
-|                       HOST LAPTOP / SERVER NODE                       |
-|                                                                       |
-|   +---------------------------------------------------------------+   |
-|   |                      Express HTTP Server                      |   |
-|   |         - Serves static Web UI (index.html, CSS, JS)          |   |
-|   |         - Auto-detects local IPv4 interface via OS module     |   |
-|   +-------------------------------+-------------------------------+   |
-|                                   |                                   |
-|   +-------------------------------+-------------------------------+   |
-|   |                  Socket.io WebSocket Server                   |   |
-|   |         - Peer Identity Registry & Broadcast Signals          |   |
-|   |         - Transfer Request / Acceptance / Cancellation        |   |
-|   |         - 64 KB Binary ArrayBuffer Streaming Relay            |   |
-|   +-------------------------------+-------------------------------+   |
-+-----------------------------------^-----------------------------------+
-|
-Local Network (Wi-Fi Router / Hotspot)
-|
-+-------------------------+-------------------------+
-|                                                   |
-+---------v-------------------------+       +-----------------v-------------------------+
-|      LAPTOP BROWSER CLIENT        |       |        MOBILE BROWSER CLIENT              |
-|  (Chrome / Edge / Firefox)        |       |    (Safari / Chrome - iOS & Android)      |
-|                                   |       |                                           |
-| - Terminal / Web QR Code Access   |       | - Camera Scans QR Code to Pair            |
-| - Drag & Drop File Picker         |       | - Dynamic Device Registration             |
-| - SHA-256 Hash Computation        |       | - ArrayBuffer Chunk Reassembly            |
-| - Real-time Progress & Speed ETA  |       | - SHA-256 Checksum Verification           |
-+-----------------------------------+       +-------------------------------------------+
+```
++-----------------------------------------------------------------------------------+
+|                                 LOCAL AREA NETWORK                                |
+|                                                                                   |
+|  +------------------------------+                  +---------------------------+  
+|  |     Sender Client (Web)      |                  |   Receiver Client (Web)   |  
+|  |   (Laptop / Mobile Browser)  |                  | (Laptop / Mobile Browser) |  
+|  +--------------+---------------+                  +-------------+-------------+  
+|                 |                                                ^                |
+|                 | 1. Select File & Target                        |                |
+|                 | 2. Compute SHA-256 Hash                        |                |
+|                 v                                                |                |
+|   +---------------------------+                    +-------------+-------------+  
+|   |    FileReader Stream      |                    |    ArrayBuffer Reassembly |  
+|   |    (64 KB Chunking)       |                    |    (Blob Generation)      |  
+|   +-------------+-------------+                    +-------------+-------------+  
+|                 |                                                ^                |
+|                 | WebSocket Binary Payload                       | Download Prompt|
+|                 v                                                |                |
+|  +-----------------------------------------------------------------------------+  
+|  |                           Node.js Express Server                            |  
+|  |                             (Port 3000 Router)                              |  
+|  |                                                                             |  
+|  |  +--------------------------+                 +--------------------------+  
+|  |  |   Socket.io Relay Hub    |                 |   Native OS IPv4 Resolver  |  
+|  |  |  (maxHttpBufferSize: 1e8)|                 |   (QRCode Terminal Display)  |  
+|  |  +------------+-------------+                 +-------------+------------+  
+|  |               |                                             |               |  
+|  +---------------+---------------------------------------------+---------------+  
+|                  |                                             |                  |
+|                  +---------------------[LAN]-------------------+                  |
++-----------------------------------------------------------------------------------+
+```
 
 ---
 
